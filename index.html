@@ -17,6 +17,8 @@
     }
     #controls {
       margin: 10px;
+      position: absolute;
+      z-index: 500;
     }
 
     br {
@@ -27,10 +29,10 @@
 <body>
   <div id="controls">
     <select id="mode-select">
-      <option value="driving">Driving</option>
-      <option value="cycling">Cycling</option>
-      <option value="walking">Walking</option>
-      <option value="driving-traffic">Driving Traffic</option>
+      <option value="driving">En voiture</option>
+      <option value="cycling">En vélo</option>
+      <option value="walking">A pied</option>
+      <option value="driving-traffic">En voiture avec trafic</option>
     </select>
     <input type="number" id="time-input" value="10" min="1" max="60" /> minutes
   </div>
@@ -40,7 +42,8 @@
 
     const map = L.map('map', {
       zoomSnap: 0.5,
-      zoomDelta: 0.5
+      zoomDelta: 0.5,
+      zoomControl: false // Désactiver les contrôles de zoom
     }).setView([46.603354, 1.888334], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
