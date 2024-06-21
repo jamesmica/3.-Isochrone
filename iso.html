@@ -11,13 +11,16 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
   <style>
     #map {
       height: 600px;
     }
     #controls {
       margin: 10px;
+    }
+
+    br {
+      color:lightgray;
     }
   </style>
 </head>
@@ -35,7 +38,10 @@
   <script>
     const mapboxAccessToken = 'pk.eyJ1IjoiamFtZXNpdGhlYSIsImEiOiJjbG93b2FiaXEwMnVpMmpxYWYzYjBvOTVuIn0.G2rAo0xl14oye9YVz4eBcw';
 
-    const map = L.map('map').setView([46.603354, 1.888334], 6);
+    const map = L.map('map', {
+      zoomSnap: 0.5,
+      zoomDelta: 0.5
+    }).setView([46.603354, 1.888334], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
@@ -47,6 +53,7 @@
 
     let lastClickedLat = null;
     let lastClickedLon = null;
+    const circlesLayer = L.layerGroup().addTo(map);
 
     modeSelect.addEventListener('change', () => {
       if (lastClickedLat && lastClickedLon) {
@@ -62,9 +69,6 @@
 
     // Charger les données CSV et préparer l'application
     loadCSVData('data-es-piscines-bdn.csv', function(data) {
-      // Utiliser MarkerCluster pour gérer les nombreux points
-      const markers = L.markerClusterGroup();
-
       const installations = {};
 
       // Regrouper les équipements par "Numéro de l'installation sportive"
@@ -79,12 +83,12 @@
           };
         }
         installations[installationId].equipments.push({
-          name: item["Nom de l'équipement"],
-          surface: item["Surface du bassin (m²)"]
+          name: item["Nom de l'équipement sportif"],
+          surface: item["Surface du bassin"]
         });
       });
 
-      // Créer un marqueur pour chaque installation
+      // Créer un cercle pour chaque installation
       Object.keys(installations).forEach(id => {
         const installation = installations[id];
         const lat = installation.lat;
@@ -93,22 +97,33 @@
         const equipments = installation.equipments;
 
         if (!isNaN(lat) && !isNaN(lon)) {
-          let popupContent = `<b>${name}</b><br>`;
+          let tooltipContent = `<b>${name}</b><br>`;
           equipments.forEach(equipment => {
-            popupContent += `Équipement: ${equipment.name}<br>Surface: ${equipment.surface} m²<br>`;
+            tooltipContent += `<hr>Équipement: ${equipment.name}<br>Surface: ${equipment.surface} m²`;
           });
 
-          const marker = L.marker([lat, lon]).bindPopup(popupContent);
-          marker.on('click', function () {
+          const circle = L.circle([lat, lon], {
+            color: '#3388ff',
+            radius: 200 // Augmenter le rayon
+          }).bindTooltip(tooltipContent, { permanent: false, direction: 'top' });
+
+          circle.on('mouseover', function () {
+            circle.openTooltip();
+          });
+
+          circle.on('mouseout', function () {
+            circle.closeTooltip();
+          });
+
+          circle.on('click', function () {
             lastClickedLat = lat;
             lastClickedLon = lon;
             updateIsochrone(lat, lon, modeSelect.value, timeInput.value);
           });
-          markers.addLayer(marker);
+
+          circlesLayer.addLayer(circle);
         }
       });
-
-      map.addLayer(markers);
     });
 
     function loadCSVData(url, callback) {
@@ -142,6 +157,11 @@
         // Centrer la carte sur l'isochrone
         const bounds = map.isochroneLayer.getBounds();
         map.fitBounds(bounds);
+
+        // Amener chaque cercle au premier plan
+        circlesLayer.eachLayer(function(layer) {
+          layer.bringToFront();
+        });
       }
     }
 
