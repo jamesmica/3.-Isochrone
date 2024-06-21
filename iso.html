@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Carte des piscines par département</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+  <style>
+    #map {
+      height: 600px;
+    }
+    #controls {
+      margin: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <select id="mode-select">
+      <option value="driving">Driving</option>
+      <option value="cycling">Cycling</option>
+      <option value="walking">Walking</option>
+      <option value="driving-traffic">Driving Traffic</option>
+    </select>
+    <input type="number" id="time-input" value="10" min="1" max="60" /> minutes
+  </div>
+  <div id="map"></div>
+  <script>
+    const mapboxAccessToken = 'pk.eyJ1IjoiamFtZXNpdGhlYSIsImEiOiJjbG93b2FiaXEwMnVpMmpxYWYzYjBvOTVuIn0.G2rAo0xl14oye9YVz4eBcw';
+
+    const map = L.map('map').setView([46.603354, 1.888334], 6);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 18
+    }).addTo(map);
+
+    const modeSelect = document.getElementById('mode-select');
+    const timeInput = document.getElementById('time-input');
+
+    let lastClickedLat = null;
+    let lastClickedLon = null;
+
+    modeSelect.addEventListener('change', () => {
+      if (lastClickedLat && lastClickedLon) {
+        updateIsochrone(lastClickedLat, lastClickedLon, modeSelect.value, timeInput.value);
+      }
+    });
+
+    timeInput.addEventListener('change', () => {
+      if (lastClickedLat && lastClickedLon) {
+        updateIsochrone(lastClickedLat, lastClickedLon, modeSelect.value, timeInput.value);
+      }
+    });
+
+    // Charger les données CSV et préparer l'application
+    loadCSVData('data-es-piscines-bdn.csv', function(data) {
+      // Utiliser MarkerCluster pour gérer les nombreux points
+      const markers = L.markerClusterGroup();
+
+      const installations = {};
+
+      // Regrouper les équipements par "Numéro de l'installation sportive"
+      data.forEach(item => {
+        const installationId = item['Numéro de l\'installation sportive'];
+        if (!installations[installationId]) {
+          installations[installationId] = {
+            lat: parseFloat(item['Latitude (WGS84)']),
+            lon: parseFloat(item['Longitude (WGS84)']),
+            name: item["Nom de l'installation sportive"],
+            equipments: []
+          };
+        }
+        installations[installationId].equipments.push({
+          name: item["Nom de l'équipement"],
+          surface: item["Surface du bassin (m²)"]
+        });
+      });
+
+      // Créer un marqueur pour chaque installation
+      Object.keys(installations).forEach(id => {
+        const installation = installations[id];
+        const lat = installation.lat;
+        const lon = installation.lon;
+        const name = installation.name;
+        const equipments = installation.equipments;
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+          let popupContent = `<b>${name}</b><br>`;
+          equipments.forEach(equipment => {
+            popupContent += `Équipement: ${equipment.name}<br>Surface: ${equipment.surface} m²<br>`;
+          });
+
+          const marker = L.marker([lat, lon]).bindPopup(popupContent);
+          marker.on('click', function () {
+            lastClickedLat = lat;
+            lastClickedLon = lon;
+            updateIsochrone(lat, lon, modeSelect.value, timeInput.value);
+          });
+          markers.addLayer(marker);
+        }
+      });
+
+      map.addLayer(markers);
+    });
+
+    function loadCSVData(url, callback) {
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        complete: function(results) {
+          callback(results.data);
+        }
+      });
+    }
+
+    async function updateIsochrone(lat, lon, mode, minutes) {
+      if (map.isochroneLayer) {
+        map.removeLayer(map.isochroneLayer);
+      }
+
+      const isochrone = await getIsochrone(lat, lon, mode, minutes);
+      if (isochrone) {
+        map.isochroneLayer = L.geoJSON(isochrone, {
+          style: function (feature) {
+            return {
+              color: '#ff7800',
+              weight: 2,
+              fillOpacity: 0.3,
+              fillColor: '#ff7800'
+            };
+          }
+        }).addTo(map);
+
+        // Centrer la carte sur l'isochrone
+        const bounds = map.isochroneLayer.getBounds();
+        map.fitBounds(bounds);
+      }
+    }
+
+    async function getIsochrone(lat, lon, mode, minutes) {
+      const url = `https://api.mapbox.com/isochrone/v1/mapbox/${mode}/${lon},${lat}?contours_minutes=${minutes}&polygons=true&access_token=${mapboxAccessToken}`;
+      
+      try {
+        const response = await axios.get(url);
+        return response.data;
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
+    }
+  </script>
+</body>
+</html>
