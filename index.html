@@ -88,7 +88,7 @@
         }
         installations[installationId].equipments.push({
           name: item["Nom de l'équipement sportif"],
-          surface: item["Surface du bassin"]
+          surface: parseFloat(item["Surface du bassin"])
         });
       });
 
@@ -103,7 +103,8 @@
         if (!isNaN(lat) && !isNaN(lon)) {
           let tooltipContent = `<b>${name}</b><br>`;
           equipments.forEach(equipment => {
-            tooltipContent += `<hr>Équipement: ${equipment.name}<br>Surface: ${equipment.surface} m²`;
+            const formattedSurface = equipment.surface.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            tooltipContent += `<hr>Équipement: ${equipment.name}<br>Surface: ${formattedSurface} m²`;
           });
 
           const circle = L.circle([lat, lon], {
