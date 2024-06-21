@@ -22,7 +22,7 @@
     }
 
     br {
-      color:lightgray;
+      color: lightgray;
     }
   </style>
 </head>
@@ -31,7 +31,7 @@
     <select id="mode-select">
       <option value="driving">En voiture</option>
       <option value="cycling">En vélo</option>
-      <option value="walking">A pied</option>
+      <option value="walking">À pied</option>
       <option value="driving-traffic">En voiture avec trafic</option>
     </select>
     <input type="number" id="time-input" value="10" min="1" max="60" /> minutes
@@ -56,6 +56,7 @@
 
     let lastClickedLat = null;
     let lastClickedLon = null;
+    let selectedCircle = null; // Variable pour stocker le cercle sélectionné
     const circlesLayer = L.layerGroup().addTo(map);
 
     modeSelect.addEventListener('change', () => {
@@ -119,6 +120,12 @@
           });
 
           circle.on('click', function () {
+            if (selectedCircle) {
+              selectedCircle.setStyle({ color: '#3388ff' }); // Rétablir la couleur d'origine
+            }
+            circle.setStyle({ color: 'red' }); // Changer la couleur en rouge
+            selectedCircle = circle;
+
             lastClickedLat = lat;
             lastClickedLon = lon;
             updateIsochrone(lat, lon, modeSelect.value, timeInput.value);
