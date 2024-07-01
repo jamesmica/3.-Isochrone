@@ -72,9 +72,6 @@
                     weight: 1
                 });
 
-                layer.on('click', function() {
-                    layer.bindPopup(`Time: ${feature.properties.time}`).openPopup();
-                });
             }
 
             async function loadIsochrones() {
@@ -136,14 +133,14 @@
                     map.on('zoomend', function() {
                         const currentZoom = map.getZoom();
 
-                        if (currentZoom >= 8) {
+                        if (currentZoom >= 9) {
                             map.addLayer(markers);
                         } else {
                             map.removeLayer(markers);
                         }
                     });
 
-                    if (map.getZoom() >= 8) {
+                    if (map.getZoom() >= 9) {
                         map.addLayer(markers);
                     }
                 });
