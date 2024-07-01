@@ -37,6 +37,10 @@
             margin-right: 5px;
             width: 12px;
         }
+
+        hr {
+            color: grey;
+        }
     </style>
 </head>
 <body>
@@ -123,7 +127,7 @@
                                 marker.bindPopup(markerInfo[key].join('<hr>')).openPopup();
                             });
                             marker.on('mouseover', function() {
-                                marker.bindTooltip(markerInfo[key].join('<br>')).openTooltip();
+                                marker.bindTooltip(markerInfo[key].join('<hr>')).openTooltip();
                             });
 
                             markers.addLayer(marker);
