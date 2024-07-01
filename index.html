@@ -67,7 +67,7 @@
                 layer.setStyle({
                     color: color,
                     fillColor: color,
-                    fillOpacity: 0.5,
+                    fillOpacity: 0.3,
                     opacity: 1,
                     weight: 1
                 });
@@ -94,8 +94,8 @@
 
             loadIsochrones();
 
-
             var markers = L.layerGroup();
+            var markerInfo = {}; // Object to store information for markers at the same position
 
             async function loadXLSX() {
                 const worker = new Worker('worker.js');
@@ -107,35 +107,43 @@
                         const lng = item.Longitude;
                         const installation = item.Installation;
                         const equipment = item.Equipement;
+                        const key = `${lat},${lng}`;
 
-                        const marker = L.circleMarker([lat, lng], {
-                            color: 'blue',
-                            radius: 2,
-                            weight:4,
-                            pane: 'markerPane'
-                        });
+                        if (!markerInfo[key]) {
+                            markerInfo[key] = [];
+                        }
+                        markerInfo[key].push(`<b>${installation}</b><br>${equipment}`);
 
-                        marker.on('click', function() {
-                            marker.bindPopup(`<b>${installation}</b><br>${equipment}`).openPopup();
-                        });
-                        marker.on('mouseover', function() {
-                            marker.bindTooltip(`<b>${installation}</b><br>${equipment}`).openTooltip();
-                        });
+                        if (markerInfo[key].length === 1) {
+                            const marker = L.circleMarker([lat, lng], {
+                                color: 'blue',
+                                radius: 2,
+                                weight: 4,
+                                pane: 'markerPane'
+                            });
 
-                        markers.addLayer(marker);
+                            marker.on('click', function() {
+                                marker.bindPopup(markerInfo[key].join('<hr>')).openPopup();
+                            });
+                            marker.on('mouseover', function() {
+                                marker.bindTooltip(markerInfo[key].join('<br>')).openTooltip();
+                            });
+
+                            markers.addLayer(marker);
+                        }
                     });
 
                     map.on('zoomend', function() {
                         const currentZoom = map.getZoom();
 
-                        if (currentZoom >= 9) {
+                        if (currentZoom >= 8) {
                             map.addLayer(markers);
                         } else {
                             map.removeLayer(markers);
                         }
                     });
 
-                    if (map.getZoom() >= 9) {
+                    if (map.getZoom() >= 8) {
                         map.addLayer(markers);
                     }
                 });
