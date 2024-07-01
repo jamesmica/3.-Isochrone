@@ -6,116 +6,145 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script lang="javascript" src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         #map {
             width: 100%;
             height: 100vh;
         }
+
+        body {
+            margin: 0;
+        }
+
+        .legend {
+            border-radius: 16px;
+            background: white;
+            padding: 10px;
+            line-height: 1.5em;
+            color: #555;
+            position: absolute;
+            z-index: 100000;
+            top: 8px;
+            right: 8px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .legend span {
+            background: #fff;
+            border: 1px solid #999;
+            display: inline-block;
+            height: 12px;
+            margin-right: 5px;
+            width: 12px;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="legend" id="legend">
+        <div><span style="background:#00FF00; opacity: 0.5;"></span> Moins de 5 minutes</div>
+        <div><span style="background:#FFFF00; opacity: 0.5;"></span> De 5 à 15 minutes</div>
+        <div><span style="background:#FF0000; opacity: 0.5;"></span> De 15 à 30 minutes</div>
+    </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialisation de la carte
-            var map = L.map('map').setView([46.2557, 5.2523], 10);
+            var map = L.map('map').setView([46.2557, 5.2523], 6);
 
-            // Ajouter une couche de carte (OpenStreetMap)
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            // Créer différents panes pour contrôler l'ordre des couches
-            map.createPane('pane30'); // De 15 à 30 minutes
-            map.createPane('pane15'); // De 5 à 15 minutes
-            map.createPane('pane5'); // Moins de 5 minutes
-            map.createPane('paneMarkers'); // Pane for markers and labels
-            
-
-
-            // Fonction pour ajouter un isochrone à la carte
-            function addIsochrone(coordinates, color, pane) {
-                var latlngs = coordinates.map(function(coord) {
-                    return [coord[1], coord[0]]; // Correction de l'ordre des coordonnées
-                });
-
-                L.polygon(latlngs, {
+            function addIsochrone(feature, layer) {
+                const contour = feature.properties.time;
+                let color;
+                if (contour === 30) {
+                    color = '#FF0000';
+                } else if (contour === 15) {
+                    color = '#FFFF00';
+                } else if (contour === 5) {
+                    color = '#00FF00';
+                }
+                layer.setStyle({
                     color: color,
                     fillColor: color,
-                    fillOpacity: 0.5, // Opacité de remplissage
-                    opacity: 1, // Opacité de contour
-                    weight: 1,
-                    pane: pane // Assigner le pane approprié
-                }).addTo(map);
+                    fillOpacity: 0.5,
+                    opacity: 1,
+                    weight: 1
+                });
+
+                layer.on('click', function() {
+                    layer.bindPopup(`Time: ${feature.properties.time}`).openPopup();
+                });
             }
 
-            // Charger et afficher les isochrones
             async function loadIsochrones() {
                 try {
                     const response = await fetch('test7.json');
                     const data = await response.json();
                     console.log(data);
 
-                    // Itérer sur chaque entité
-                    data.features.forEach(function(feature) {
-                        const contour = feature.properties.time;
-                        let color, pane;
-                        if (contour === 30) {
-                            color = '#FF0000'; // Red for 15 to 30 minutes
-                            pane = 'pane30';
-                        } else if (contour === 15) {
-                            color = '#FFFF00'; // Yellow for 5 to 15 minutes
-                            pane = 'pane15';
-                        } else if (contour === 5) {
-                            color = '#00FF00'; // Green for less than 5 minutes
-                            pane = 'pane5';
-                        }
-                        feature.geometry.coordinates.forEach(polygon => {
-                            polygon.forEach(coordinates => {
-                                addIsochrone(coordinates, color, pane);
-                            });
-                        });
-                    });
+                    L.geoJSON(data, {
+                        onEachFeature: addIsochrone
+                    }).addTo(map);
 
                 } catch (error) {
                     console.error('Error loading isochrones:', error);
                 }
             }
 
-            // Charger les isochrones au démarrage
             loadIsochrones();
 
+
+            var markers = L.layerGroup();
+
             async function loadXLSX() {
-                const response = await fetch('data-es.xlsx'); // Remplacez cette URL par le chemin de votre fichier
-                const arrayBuffer = await response.arrayBuffer();
-                const data = new Uint8Array(arrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
+                const worker = new Worker('worker.js');
+                worker.addEventListener('message', function(e) {
+                    const jsonData = e.data;
 
-                // Supposons que les données se trouvent dans la première feuille
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    jsonData.forEach(item => {
+                        const lat = item.Latitude;
+                        const lng = item.Longitude;
+                        const installation = item.Installation;
+                        const equipment = item.Equipement;
 
-                // Affichage des marqueurs et des étiquettes sur la carte
-                jsonData.forEach(item => {
-                    const lat = item.Latitude;
-                    const lng = item.Longitude;
-                    const installation = item.Installation;
-                    const equipment = item.Equipement;
+                        const marker = L.circleMarker([lat, lng], {
+                            color: 'blue',
+                            radius: 2,
+                            weight:4,
+                            pane: 'markerPane'
+                        });
 
-                    // Ajouter un marqueur pour chaque point
-                    L.circleMarker([lat, lng], {
-                        color: 'blue',
-                        radius: 1.5,
-                        pane: 'paneMarkers'
-                    }).addTo(map)
-                    .bindPopup(`<b>${installation}</b><br>${equipment}`);
+                        marker.on('click', function() {
+                            marker.bindPopup(`<b>${installation}</b><br>${equipment}`).openPopup();
+                        });
+                        marker.on('mouseover', function() {
+                            marker.bindTooltip(`<b>${installation}</b><br>${equipment}`).openTooltip();
+                        });
 
-  
+                        markers.addLayer(marker);
+                    });
+
+                    map.on('zoomend', function() {
+                        const currentZoom = map.getZoom();
+
+                        if (currentZoom >= 9) {
+                            map.addLayer(markers);
+                        } else {
+                            map.removeLayer(markers);
+                        }
+                    });
+
+                    if (map.getZoom() >= 9) {
+                        map.addLayer(markers);
+                    }
                 });
+
+                const response = await fetch('data-es.xlsx');
+                const arrayBuffer = await response.arrayBuffer();
+                worker.postMessage(arrayBuffer);
             }
 
-            // Charger et afficher les données XLSX au démarrage
             loadXLSX();
         });
     </script>
