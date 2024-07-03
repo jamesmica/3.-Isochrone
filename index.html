@@ -183,10 +183,6 @@
                             map.removeLayer(markers);
                         }
                     });
-
-                    if (map.getZoom() >= 9) {
-                        map.addLayer(markers);
-                    }
                 });
 
                 const response = await fetch('data-es.xlsx');
@@ -219,7 +215,8 @@
                     const regionsLayer = L.geoJSON(data);
 
                     // Extract region names and sort them
-                    const regionNames = data.features.map(feature => feature.properties.reg_name[0]).sort();
+                    const regionNames = data.features.map(feature => feature.properties.reg_name[0]);
+                    regionNames.sort((a, b) => a.normalize("NFD").replace(/[\u0300-\u036f]/g, "").localeCompare(b.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
 
                     // Populate select input with sorted region names
                     regionNames.forEach(regionName => {
