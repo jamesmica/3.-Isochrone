@@ -41,10 +41,21 @@
         hr {
             color: grey;
         }
+
+        #regionSelect {
+            position: absolute;
+            top: 12px;
+            left: 64px;
+            z-index: 1000;
+            padding: 8px;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <select id="regionSelect">
+        <option value="">Sélectionner une région</option>
+    </select>
     <div class="legend" id="legend">
         <div><span style="background:#00FF00; opacity: 0.5;"></span> Moins de 5 minutes</div>
         <div><span style="background:#FFFF00; opacity: 0.5;"></span> De 5 à 15 minutes</div>
@@ -155,6 +166,64 @@
             }
 
             loadXLSX();
+
+            // Layer to show the selected region's contour
+            var selectedRegionLayer;
+
+            // Style for the selected region's contour
+            function styleRegion(feature) {
+                return {
+                    color: '#3388ff',
+                    weight: 4,
+                    opacity: 1,
+                    fillOpacity: 0
+                };
+            }
+
+            // Load regions and populate select input
+            async function loadRegions() {
+                try {
+                    const response = await fetch('regions.geojson');
+                    const data = await response.json();
+                    
+                    const select = document.getElementById('regionSelect');
+                    const regionsLayer = L.geoJSON(data);
+
+                    // Extract region names and sort them
+                    const regionNames = data.features.map(feature => feature.properties.reg_name[0]).sort();
+
+                    // Populate select input with sorted region names
+                    regionNames.forEach(regionName => {
+                        const option = document.createElement('option');
+                        option.value = regionName;
+                        option.text = regionName;
+                        select.appendChild(option);
+                    });
+
+                    select.addEventListener('change', function() {
+                        const selectedOption = select.options[select.selectedIndex];
+                        if (selectedOption.value) {
+                            const selectedRegion = data.features.find(feature => feature.properties.reg_name[0] === selectedOption.value);
+                            if (selectedRegion) {
+                                const regionLayer = L.geoJSON(selectedRegion, {style: styleRegion});
+                                map.fitBounds(regionLayer.getBounds());
+
+                                // Remove previous region contour if exists
+                                if (selectedRegionLayer) {
+                                    map.removeLayer(selectedRegionLayer);
+                                }
+
+                                // Add new region contour with style
+                                selectedRegionLayer = regionLayer.addTo(map);
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error loading regions:', error);
+                }
+            }
+
+            loadRegions();
         });
     </script>
 </body>
